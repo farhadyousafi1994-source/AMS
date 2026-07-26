@@ -1,0 +1,348 @@
+From 50edbede2759a5636778c0b526963de88825a994 Mon Sep 17 00:00:00 2001
+From: Fazil <briskcodeio@gmail.com>
+Date: Thu, 23 Jul 2026 15:26:21 +0000
+Subject: [PATCH] Registry module tabs + full option coverage; header language
+ & back; attendance guards
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Options Registry: module tabs (All / Projects / Finance / HR / Procurement /
+Safety / Other) with group counts organise every dropdown group; seeded the
+missing system-wide groups so each select has a home in the registry —
+asset_category, asset_condition, weather, change_order_reason, gender,
+marital_status, employment_type (bilingual, system-locked codes).
+
+Header: the language switcher (EN/دری/پښتو) is back in the top bar and a Back
+button sits next to the hamburger for fullscreen/PWA use; the calendar-lead
+preference moved to Theme & Appearance as a Fine-tune toggle.
+
+Attendance: past days can be recorded, future days cannot — the date picker
+clamps to today with a warning and the three write endpoints validate
+before_or_equal:today.
+---
+ .../Controllers/HR/AttendanceController.php   |  6 +-
+ backend/database/seeders/LookupSeeder.php     | 43 +++++++++++++++
+ frontend/src/i18n/en/index.js                 |  7 +++
+ frontend/src/i18n/fa/index.js                 |  7 +++
+ frontend/src/layouts/MainLayout.vue           | 19 +++++--
+ frontend/src/pages/hr/AttendancePage.vue      | 12 +++-
+ .../src/pages/system/OptionsRegistryPage.vue  | 55 ++++++++++++++++++-
+ frontend/src/pages/system/ThemePage.vue       | 12 ++++
+ 8 files changed, 147 insertions(+), 14 deletions(-)
+
+diff --git a/backend/app/Http/Controllers/HR/AttendanceController.php b/backend/app/Http/Controllers/HR/AttendanceController.php
+index a88e82f..4ebdd3e 100644
+--- a/backend/app/Http/Controllers/HR/AttendanceController.php
++++ b/backend/app/Http/Controllers/HR/AttendanceController.php
+@@ -79,7 +79,7 @@ public function day(Request $request): JsonResponse
+     public function save(Request $request): JsonResponse
+     {
+         $data = $request->validate([
+-            'date' => ['required', 'date'],
++            'date' => ['required', 'date', 'before_or_equal:today'],
+             'rows' => ['required', 'array'],
+             'rows.*.employee_id' => ['required', 'integer', 'exists:employees,id'],
+             'rows.*.status' => ['required', 'in:present,absent,leave,holiday'],
+@@ -107,7 +107,7 @@ public function record(Request $request): JsonResponse
+     {
+         $data = $request->validate([
+             'employee_id' => ['required', 'integer', 'exists:employees,id'],
+-            'date' => ['required', 'date'],
++            'date' => ['required', 'date', 'before_or_equal:today'],
+             'status' => ['required', 'in:present,absent,leave,holiday'],
+             'note' => ['nullable', 'string'],
+             'check_in' => ['nullable', 'string', 'max:10'],
+@@ -136,7 +136,7 @@ public function record(Request $request): JsonResponse
+     public function syncDevice(Request $request): JsonResponse
+     {
+         $data = $request->validate([
+-            'date' => ['required', 'date'],
++            'date' => ['required', 'date', 'before_or_equal:today'],
+             'device_id' => ['nullable', 'integer', 'exists:fingerprint_devices,id'],
+         ]);
+ 
+diff --git a/backend/database/seeders/LookupSeeder.php b/backend/database/seeders/LookupSeeder.php
+index 13fff10..01b9749 100644
+--- a/backend/database/seeders/LookupSeeder.php
++++ b/backend/database/seeders/LookupSeeder.php
+@@ -145,6 +145,49 @@ private function groups(): array
+                 ['other', 'Other', 'سایر'],
+             ],
+             'province' => $this->provinces(),
++            // ── Assets & procurement ──
++            'asset_category' => [
++                ['heavy_machinery', 'Heavy Machinery', 'ماشین‌آلات سنگین'],
++                ['vehicles', 'Vehicles', 'وسایط نقلیه'],
++                ['tools', 'Tools', 'ابزار'],
++                ['equipment', 'Equipment', 'تجهیزات'],
++            ],
++            'asset_condition' => [
++                ['new', 'New', 'نو'],
++                ['good', 'Good', 'خوب'],
++                ['fair', 'Fair', 'متوسط'],
++                ['needs_repair', 'Needs Repair', 'نیاز به ترمیم'],
++            ],
++            // ── Site diary ──
++            'weather' => [
++                ['sunny', 'Sunny', 'آفتابی'],
++                ['cloudy', 'Cloudy', 'ابری'],
++                ['rainy', 'Rainy', 'بارانی'],
++                ['windy', 'Windy', 'بادی'],
++                ['snow', 'Snow', 'برفی'],
++                ['hot', 'Hot', 'گرم'],
++                ['cold', 'Cold', 'سرد'],
++            ],
++            'change_order_reason' => [
++                ['owner_request', 'Owner request', 'درخواست مالک'],
++                ['design_change', 'Design change', 'تغییر دیزاین'],
++                ['site_condition', 'Site condition', 'وضعیت ساحه'],
++                ['error', 'Error / omission', 'اشتباه / از قلم‌افتادگی'],
++            ],
++            // ── HR ──
++            'gender' => [
++                ['male', 'Male', 'مرد'],
++                ['female', 'Female', 'زن'],
++            ],
++            'marital_status' => [
++                ['single', 'Single', 'مجرد'],
++                ['married', 'Married', 'متأهل'],
++            ],
++            'employment_type' => [
++                ['permanent', 'Permanent', 'دائمی'],
++                ['contract', 'Contract', 'قراردادی'],
++                ['daily_wage', 'Daily Wage', 'روزمزد'],
++            ],
+         ];
+     }
+ 
+diff --git a/frontend/src/i18n/en/index.js b/frontend/src/i18n/en/index.js
+index 728dbe1..8edfc8d 100644
+--- a/frontend/src/i18n/en/index.js
++++ b/frontend/src/i18n/en/index.js
+@@ -272,6 +272,13 @@ export default {
+   // Theme
+   DisplayMode: 'Display Mode',
+   Language: 'Language',
++  AssetCategory: 'Asset Category',
++  AssetCondition: 'Asset Condition',
++  ChangeOrderReason: 'Change Order Reason',
++  CalendarLead: 'Calendar',
++  Gregorian: 'Gregorian',
++  SolarHijri: 'Solar (خورشیدی)',
++  NoFutureAttendance: 'Attendance cannot be recorded for future days',
+   TakeAttendance: 'Take Attendance',
+   AttendanceManagement: 'Attendance Management',
+   Marked: 'Marked',
+diff --git a/frontend/src/i18n/fa/index.js b/frontend/src/i18n/fa/index.js
+index 4979973..136301b 100644
+--- a/frontend/src/i18n/fa/index.js
++++ b/frontend/src/i18n/fa/index.js
+@@ -272,6 +272,13 @@ export default {
+   // Theme
+   DisplayMode: 'حالت نمایش',
+   Language: 'زبان',
++  AssetCategory: 'دسته‌بندی اموال',
++  AssetCondition: 'حالت دارایی',
++  ChangeOrderReason: 'دلیل تغییر قرارداد',
++  CalendarLead: 'تقویم',
++  Gregorian: 'میلادی',
++  SolarHijri: 'خورشیدی',
++  NoFutureAttendance: 'حاضری برای روزهای آینده ثبت شده نمی‌تواند',
+   TakeAttendance: 'ثبت حاضری',
+   AttendanceManagement: 'مدیریت حاضری',
+   Marked: 'ثبت‌شده',
+diff --git a/frontend/src/layouts/MainLayout.vue b/frontend/src/layouts/MainLayout.vue
+index c4ff7af..de53fa9 100644
+--- a/frontend/src/layouts/MainLayout.vue
++++ b/frontend/src/layouts/MainLayout.vue
+@@ -8,6 +8,11 @@
+         <q-btn flat dense round icon="menu" color="white" aria-label="Menu"
+           @click="leftDrawerOpen = !leftDrawerOpen" />
+ 
++        <!-- Back — needed in fullscreen / PWA where the browser bar is hidden -->
++        <q-btn flat dense round icon="arrow_back" color="white" size="sm" class="q-ml-xs" @click="$router.back()">
++          <q-tooltip>{{ $t('Back') }}</q-tooltip>
++        </q-btn>
++
+         <!-- Company avatar + Brand text + Breadcrumb -->
+         <div class="row items-center no-wrap q-ml-xs" style="gap:8px; overflow:hidden">
+           <q-avatar color="white" text-color="primary" size="28px"
+@@ -81,12 +86,14 @@
+         </q-btn>
+ 
+ 
+-        <!-- Date chip — today in both calendars; tap to switch which leads -->
+-        <q-btn flat dense no-caps color="white" class="q-mx-xs header-date" @click="toggleCalendar">
+-          <q-icon name="event" size="16px" class="q-mr-xs" />
+-          <span class="header-date__txt">{{ headerDate }}</span>
+-          <q-tooltip>{{ calendarType === 'fa' ? $t('CalendarShamsiLead') : $t('CalendarGregorianLead') }}</q-tooltip>
+-        </q-btn>
++        <!-- Language switcher (calendar preference lives in Theme settings) -->
++        <q-btn-dropdown v-if="$can('language-list')" flat dense icon="language" :label="currentLang" size="sm" color="white" class="q-mx-xs">
++          <q-list dense>
++            <q-item v-if="$can('lang-en-list')" clickable v-close-popup @click="setLang('en')"><q-item-section>English</q-item-section></q-item>
++            <q-item v-if="$can('lang-fa-list')" clickable v-close-popup @click="setLang('fa')"><q-item-section>دری</q-item-section></q-item>
++            <q-item v-if="$can('lang-pa-list')" clickable v-close-popup @click="setLang('pa')"><q-item-section>پښتو</q-item-section></q-item>
++          </q-list>
++        </q-btn-dropdown>
+ 
+         <!-- User avatar — shows who is logged in -->
+         <q-btn flat round color="white" class="q-ml-xs">
+diff --git a/frontend/src/pages/hr/AttendancePage.vue b/frontend/src/pages/hr/AttendancePage.vue
+index fb99048..8f9f2d1 100644
+--- a/frontend/src/pages/hr/AttendancePage.vue
++++ b/frontend/src/pages/hr/AttendancePage.vue
+@@ -240,7 +240,7 @@
+ </template>
+ 
+ <script setup>
+-import { ref, computed, getCurrentInstance, onMounted } from 'vue'
++import { ref, computed, watch, getCurrentInstance, onMounted } from 'vue'
+ import { Notify } from 'quasar'
+ import { api } from '@/boot/axios'
+ import { useAuthStore } from '@/stores/auth'
+@@ -249,7 +249,15 @@ import { shamsiDate } from '@/utils/date'
+ const { proxy } = getCurrentInstance()
+ const auth = useAuthStore()
+ 
+-const date = ref(new Date().toISOString().slice(0, 10))
++const today = new Date().toISOString().slice(0, 10)
++const date = ref(today)
++// Past days are fine (catching up a missed sheet); future days are not.
++watch(date, (v) => {
++  if (v && v > today) {
++    date.value = today
++    Notify.create({ type: 'warning', position: 'bottom', icon: 'event_busy', message: proxy.$t('NoFutureAttendance') })
++  }
++})
+ const departmentId = ref(null)
+ const q = ref('')
+ const rows = ref([])
+diff --git a/frontend/src/pages/system/OptionsRegistryPage.vue b/frontend/src/pages/system/OptionsRegistryPage.vue
+index 48bfd6c..380810e 100644
+--- a/frontend/src/pages/system/OptionsRegistryPage.vue
++++ b/frontend/src/pages/system/OptionsRegistryPage.vue
+@@ -8,6 +8,17 @@
+           </m-header>
+         </div>
+ 
++        <!-- Module tabs — every select in the system, organised by department -->
++        <div class="col-12 q-mt-sm">
++          <q-card flat bordered class="my_radio_less bg-white">
++            <q-tabs v-model="tab" dense no-caps inline-label align="left" active-color="primary" indicator-color="primary" class="reg-tabs">
++              <q-tab v-for="t in moduleTabs" :key="t.key" :name="t.key" :icon="t.icon" :label="$t(t.label)">
++                <q-badge v-if="t.key !== 'all'" floating transparent color="grey-6">{{ groupsForTab(t.key).length }}</q-badge>
++              </q-tab>
++            </q-tabs>
++          </q-card>
++        </div>
++
+         <div class="col-12 q-mt-sm">
+           <div class="row q-col-gutter-md">
+             <!-- Groups sidebar -->
+@@ -132,7 +143,7 @@
+ </template>
+ 
+ <script setup>
+-import { ref, reactive, computed, getCurrentInstance, onMounted } from 'vue'
++import { ref, reactive, computed, watch, getCurrentInstance, onMounted } from 'vue'
+ import { Notify } from 'quasar'
+ import { api } from '@/boot/axios'
+ import { useLookups } from '@/composables/useLookups'
+@@ -161,15 +172,52 @@ const GROUP_META = {
+   payment_method: ['PaymentMethod', 'payments'], party_type: ['PartyType', 'groups'], worker_trade: ['Trade', 'engineering'],
+   fuel_type: ['FuelType', 'local_gas_station'], leave_type: ['LeaveType', 'event_busy'], incident_type: ['IncidentType', 'report_problem'],
+   incident_severity: ['Severity', 'warning'], expense_category: ['ExpenseCategory', 'receipt_long'], province: ['Province', 'map'],
++  asset_category: ['AssetCategory', 'construction'], asset_condition: ['AssetCondition', 'build_circle'],
++  weather: ['Weather', 'wb_sunny'], change_order_reason: ['ChangeOrderReason', 'published_with_changes'],
++  gender: ['Gender', 'wc'], marital_status: ['MaritalStatus', 'family_restroom'], employment_type: ['EmploymentType', 'badge'],
+ }
+ function groupLabelKey (g) { return GROUP_META[g]?.[0] || humanize(g) }
+ function groupIcon (g) { return GROUP_META[g]?.[1] || 'label' }
+ function humanize (g) { return String(g || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }
+ 
++// ── Module tabs: every select in the system, grouped the way the menu is ──
++const tab = ref('all')
++const moduleTabs = [
++  { key: 'all', label: 'All', icon: 'apps' },
++  { key: 'projects', label: 'Projects', icon: 'domain' },
++  { key: 'finance', label: 'FinanceAndAccounting', icon: 'account_balance_wallet' },
++  { key: 'hr', label: 'HRAndPayroll', icon: 'badge' },
++  { key: 'procurement', label: 'ProcurementAndAssets', icon: 'local_shipping' },
++  { key: 'safety', label: 'SafetyAndQuality', icon: 'health_and_safety' },
++  { key: 'general', label: 'Other', icon: 'category' },
++]
++const TAB_GROUPS = {
++  projects: ['project_type', 'project_status', 'task_phase', 'priority', 'unit', 'drawing_category', 'weather', 'change_order_reason'],
++  finance: ['payment_method', 'expense_category', 'party_type'],
++  hr: ['leave_type', 'worker_trade', 'gender', 'marital_status', 'employment_type'],
++  procurement: ['asset_category', 'asset_condition', 'fuel_type'],
++  safety: ['incident_type', 'incident_severity'],
++}
++function groupsForTab (t) {
++  if (t === 'all') return groupList.value
++  if (t === 'general') {
++    const known = Object.values(TAB_GROUPS).flat()
++    return groupList.value.filter((g) => !known.includes(g))
++  }
++  return groupList.value.filter((g) => (TAB_GROUPS[t] || []).includes(g))
++}
++
+ const filteredGroups = computed(() => {
++  let list = groupsForTab(tab.value)
+   const q = (groupSearch.value || '').toLowerCase()
+-  if (!q) return groupList.value
+-  return groupList.value.filter((g) => g.toLowerCase().includes(q) || proxy.$t(groupLabelKey(g)).toLowerCase().includes(q))
++  if (q) list = list.filter((g) => g.toLowerCase().includes(q) || proxy.$t(groupLabelKey(g)).toLowerCase().includes(q))
++  return list
++})
++
++// Keep the selected group inside the active tab.
++watch(tab, () => {
++  const list = groupsForTab(tab.value)
++  if (list.length && !list.includes(active.value)) active.value = list[0]
+ })
+ const rowsForActive = computed(() => all.value[active.value] || [])
+ const visibleRows = computed(() => showInactive.value ? rowsForActive.value : rowsForActive.value.filter((r) => r.active))
+@@ -240,6 +288,7 @@ onMounted(load)
+ </script>
+ 
+ <style scoped>
++.reg-tabs :deep(.q-tab) { min-height: 44px; }
+ .reg-side { overflow: hidden; }
+ .reg-side__head { display: flex; align-items: center; font-weight: 800; color: var(--q-primary); padding: 12px 14px; border-bottom: 1px solid #EEF2F7; }
+ .reg-grouplist { max-height: 62vh; overflow-y: auto; }
+diff --git a/frontend/src/pages/system/ThemePage.vue b/frontend/src/pages/system/ThemePage.vue
+index 5601976..fd3716d 100644
+--- a/frontend/src/pages/system/ThemePage.vue
++++ b/frontend/src/pages/system/ThemePage.vue
+@@ -89,6 +89,14 @@
+           </q-card>
+         </div>
+ 
++        <div class="col-12 col-sm-6 col-md-3">
++          <q-card flat bordered class="th-tune">
++            <div class="th-tune__t"><q-icon name="event" size="16px" class="q-mr-xs" />{{ $t('CalendarLead') }}</div>
++            <q-btn-toggle v-model="calendarType" spread unelevated toggle-color="primary" color="grey-2" text-color="grey-9"
++              :options="[{label:$t('Gregorian'),value:'en'},{label:$t('SolarHijri'),value:'fa'}]" @update:model-value="applyCalendar" />
++          </q-card>
++        </div>
++
+         <div class="col-12">
+           <q-btn outline color="negative" icon="restart_alt" :label="$t('ResetToDefault')" no-caps @click="resetAll" />
+         </div>
+@@ -168,6 +176,10 @@ function applyScheme (s) {
+   Notify.create({ type: 'positive', position: 'bottom', icon: 'palette', message: s.name })
+ }
+ 
++// Which calendar leads in every date display (میلادی or خورشیدی).
++const calendarType = ref(localStorage.getItem('calendar_type') === 'fa' ? 'fa' : 'en')
++function applyCalendar (v) { localStorage.setItem('calendar_type', v); window.location.reload() }
++
+ function applyDark (val) { $q.dark.set(val); localStorage.setItem('theme_dark', val ? '1' : '0') }
+ function applyFont (size) { const m = { small: '13px', normal: '14px', large: '16px' }; document.documentElement.style.fontSize = m[size]; localStorage.setItem('theme_font', size) }
+ function applyRadius (r) { set('--my-radius', r); localStorage.setItem('theme_radius', r) }
+-- 
+2.43.0
+
